@@ -31,7 +31,7 @@ CrushOnYouAudioProcessor::CrushOnYouAudioProcessor()
         1)); // defaultValue
     addParameter(bitDepthParam = new AudioParameterInt("bitDepth", // parameterID,
         "Bit-Depth", // parameterName,
-        1, // minValue,
+        2, // minValue,
         24, // maxValue,
         24)); // defaultValue
 
@@ -173,7 +173,7 @@ void CrushOnYouAudioProcessor::bitcrush(float& sample) {
 }
 
 void CrushOnYouAudioProcessor::bitcrushNormalStrategy(float& sample) {
-    float ql = 2 / (pow(2, bitDepth) - 1);
+    float ql = 1 / (pow(2, bitDepth) - 1);
     sample = ql * ((int)(sample / ql));
 }
 
@@ -182,8 +182,8 @@ void CrushOnYouAudioProcessor::bitcrushBitshiftStrategy(float& sample) {
 
     // yeah
     long  i = *(long*)&temp;
-    i >>= 24 - bitDepth;
-    i <<= 24 - bitDepth;
+    i >>= 27 - bitDepth;
+    i <<= 27 - bitDepth;
     temp = *(float*)&i;
 
     sample = temp;
