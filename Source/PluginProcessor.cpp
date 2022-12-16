@@ -24,6 +24,12 @@ CrushOnYouAudioProcessor::CrushOnYouAudioProcessor()
                        )
 #endif
 {
+    addParameter(wetDryParam = new AudioParameterFloat("Mix", // parameterID,
+        "Mix", // parameterName,
+        -1.0f, // fully dry,
+        1.0f, // fully wet,
+        1.0f)); // fully wet by default
+
     addParameter(dsFactorParam = new AudioParameterInt("dsFactor", // parameterID,
         "Downsample Factor", // parameterName,
         1, // minValue,
@@ -42,6 +48,88 @@ CrushOnYouAudioProcessor::CrushOnYouAudioProcessor()
         choices, // choice list,
         0, // default (QL equation),
         attributes));
+
+    addParameter(masksEnabledParam = new AudioParameterBool("masksEnabled",
+        "Enable Masks",
+        true));
+
+    constexpr unsigned mask0{ 0b00000000000000000000000000000001 }; // bit 0
+    constexpr unsigned mask1{ 0b00000000000000000000000000000010 }; // bit 1
+    constexpr unsigned mask2{ 0b00000000000000000000000000000100 }; // bit 2
+    constexpr unsigned mask3{ 0b00000000000000000000000000001000 }; // bit 3
+    constexpr unsigned mask4{ 0b00000000000000000000000000010000 }; // bit 4
+    constexpr unsigned mask5{ 0b00000000000000000000000000100000 }; // bit 5
+    constexpr unsigned mask6{ 0b00000000000000000000000001000000 }; // bit 6
+    constexpr unsigned mask7{ 0b00000000000000000000000010000000 }; // bit 7
+
+    constexpr unsigned mask8{ 0b00000000000000000000000100000000 }; // bit 8
+    constexpr unsigned mask9{ 0b00000000000000000000001000000000 }; // bit 9
+    constexpr unsigned mask10{ 0b00000000000000000000010000000000 }; // bit 10
+    constexpr unsigned mask11{ 0b00000000000000000000100000000000 }; // bit 11
+    constexpr unsigned mask12{ 0b00000000000000000001000000000000 }; // bit 12
+    constexpr unsigned mask13{ 0b00000000000000000010000000000000 }; // bit 13
+    constexpr unsigned mask14{ 0b00000000000000000100000000000000 }; // bit 14
+    constexpr unsigned mask15{ 0b00000000000000001000000000000000 }; // bit 15
+
+    constexpr unsigned mask16{ 0b00000000000000010000000000000000 }; // bit 16
+    constexpr unsigned mask17{ 0b00000000000000100000000000000000 }; // bit 17
+    constexpr unsigned mask18{ 0b00000000000001000000000000000000 }; // bit 18
+    constexpr unsigned mask19{ 0b00000000000010000000000000000000 }; // bit 19
+    constexpr unsigned mask20{ 0b00000000000100000000000000000000 }; // bit 20
+    constexpr unsigned mask21{ 0b00000000001000000000000000000000 }; // bit 21
+    constexpr unsigned mask22{ 0b00000000010000000000000000000000 }; // bit 22
+    constexpr unsigned mask23{ 0b00000000100000000000000000000000 }; // bit 23
+
+    constexpr unsigned mask24{ 0b00000001000000000000000000000000 }; // bit 24
+    constexpr unsigned mask25{ 0b00000010000000000000000000000000 }; // bit 25
+    constexpr unsigned mask26{ 0b00000100000000000000000000000000 }; // bit 26
+    constexpr unsigned mask27{ 0b00001000000000000000000000000000 }; // bit 27
+    constexpr unsigned mask28{ 0b00010000000000000000000000000000 }; // bit 28
+    constexpr unsigned mask29{ 0b00100000000000000000000000000000 }; // bit 29
+    constexpr unsigned mask30{ 0b01000000000000000000000000000000 }; // bit 30
+    constexpr unsigned mask31{ 0b10000000000000000000000000000000 }; // bit 31
+
+    AudioParameterBool* temp;
+    
+    for (int i = 0; i < 32; i++) {
+        addParameter(temp = new AudioParameterBool("mask" + std::to_string(i), std::to_string(i), false));
+        bitMaskParams.push_back(temp);
+        isMaskUsed.push_back(false);
+    }
+
+    masks.push_back(mask0);
+    masks.push_back(mask1);
+    masks.push_back(mask2);
+    masks.push_back(mask3);
+    masks.push_back(mask4);
+    masks.push_back(mask5);
+    masks.push_back(mask6);
+    masks.push_back(mask7);
+    masks.push_back(mask8);
+    masks.push_back(mask9);
+    masks.push_back(mask10);
+    masks.push_back(mask11);
+    masks.push_back(mask12);
+    masks.push_back(mask13);
+    masks.push_back(mask14);
+    masks.push_back(mask15);
+    masks.push_back(mask16);
+    masks.push_back(mask17);
+    masks.push_back(mask18);
+    masks.push_back(mask19);
+    masks.push_back(mask20);
+    masks.push_back(mask21);
+    masks.push_back(mask22);
+    masks.push_back(mask23);
+    masks.push_back(mask24);
+    masks.push_back(mask25);
+    masks.push_back(mask26);
+    masks.push_back(mask27);
+    masks.push_back(mask28);
+    masks.push_back(mask29);
+    masks.push_back(mask30);
+    masks.push_back(mask31);
+
 }
 
 CrushOnYouAudioProcessor::~CrushOnYouAudioProcessor()
@@ -150,8 +238,15 @@ bool CrushOnYouAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 #endif
 
 void CrushOnYouAudioProcessor::updateParameters() {
+    setWetDryBalance(wetDryParam->get());
     dsFactor = dsFactorParam->get();
     bitDepth = bitDepthParam->get();
+    masksEnabled = masksEnabledParam->get();
+    if (masksEnabled) {
+        for (int i = 0; i < 32; i++) {
+            isMaskUsed[i] = bitMaskParams[i]->get();
+        }
+    }
     crushMode = crushMethodParam->getIndex(); // using JUCE String gave weird results, so using int
 }
 
@@ -173,7 +268,11 @@ void CrushOnYouAudioProcessor::bitcrush(float& sample) {
 }
 
 void CrushOnYouAudioProcessor::bitcrushNormalStrategy(float& sample) {
-    float ql = 1 / (pow(2, bitDepth) - 1);
+    // only update if bitdepth has changed
+    if (bitDepthMem != bitDepth){
+        ql = 1.0f / (pow(2, bitDepth) - 1.0f);
+        bitDepthMem = bitDepth;
+    }
     sample = ql * ((int)(sample / ql));
 }
 
@@ -181,12 +280,31 @@ void CrushOnYouAudioProcessor::bitcrushBitshiftStrategy(float& sample) {
     float temp = sample;
 
     // yeah
-    long  i = *(long*)&temp;
-    i >>= 27 - bitDepth;
-    i <<= 27 - bitDepth;
-    temp = *(float*)&i;
+    int toShift = *(int*)&temp;
+    toShift >>= 27 - bitDepth;
+    toShift <<= 27 - bitDepth;
+    temp = *(float*)&toShift;
 
     sample = temp;
+}
+
+void CrushOnYouAudioProcessor::bitmask(float& sample) {
+
+    float temp = sample;
+    int toMask = *(int*)&temp;
+    for (int i = 0; i < 32; i++) {
+        if (isMaskUsed[i]) {
+            toMask &= ~masks[i]; // 0 out bit at mask index
+        }
+    }
+    temp = *(float*)&toMask;
+    sample = temp;
+}
+
+void CrushOnYouAudioProcessor::setWetDryBalance(float userIn) {
+    userIn = (userIn + 1.0f) / 4.0f;
+    wetGain = sin(MathConstants<float>::pi * userIn);
+    dryGain = cos(MathConstants<float>::pi * userIn);
 }
 
 void CrushOnYouAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
@@ -212,11 +330,16 @@ void CrushOnYouAudioProcessor::processBlock (AudioBuffer<float>& buffer, MidiBuf
         bitcrush(tempL);
         bitcrush(tempR);
 
+        if (masksEnabled) {
+            bitmask(tempL);
+            bitmask(tempR);
+        }
+
         decimate(tempL, samp);
         decimate(tempR, samp);
 
-        channelL[samp] = tempL;
-        channelR[samp] = tempR;
+        channelL[samp] = dryGain*channelL[samp] + wetGain*tempL;
+        channelR[samp] = dryGain*channelR[samp] + wetGain*tempR;
     }
 }
 

@@ -60,24 +60,37 @@ public:
 
 private:
     //==============================================================================
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CrushOnYouAudioProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CrushOnYouAudioProcessor);
 
     // User param variables ========================================================
 
+    AudioParameterFloat* wetDryParam;
     AudioParameterInt* dsFactorParam;
     AudioParameterInt* bitDepthParam;
     AudioParameterChoice* crushMethodParam;
+    AudioParameterBool* masksEnabledParam;
+    std::vector<AudioParameterBool*> bitMaskParams;
 
     // Private algo variables ======================================================
+
+    float wetGain, dryGain;
 
     int dsFactor;
     float dsSamp; // current sample kept in decimation algorithm
 
-    int bitDepth;
     int crushMode;
+
+    int bitDepth;
+    int bitDepthMem = -1;
+    float ql;
+
+    bool masksEnabled = false;
+    std::vector<unsigned> masks;
+    std::vector<bool> isMaskUsed;
 
     // Algo functions ==============================================================
 
+    void setWetDryBalance(float userIn);
     void decimate(float& sample, const int& index);
     void bitcrush(float& sample);
 
@@ -87,6 +100,10 @@ private:
         // bitshift based crush, uses a hacky pointer cast trick from the fast inverse sqrt algorithm.
         // https://en.wikipedia.org/wiki/Fast_inverse_square_root#Overview_of_the_code
         void bitcrushBitshiftStrategy(float& sample);
+
+    // uses bitmasks to create general distortion.
+    // I think it's cool even if it's not necessarily a bit-depth reduction
+    void bitmask(float& sample);
 
     // Helpers
     void updateParameters();
